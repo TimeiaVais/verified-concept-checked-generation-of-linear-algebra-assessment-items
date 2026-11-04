@@ -1,0 +1,13 @@
+[
+  "tests/test_graph.py::test_cycle",
+  "tests/test_graph.py::test_duplicate_id",
+  "tests/test_graph.py::test_real_graph_loads",
+  "tests/test_graph.py::test_self_prerequisite",
+  "tests/test_graph.py::test_unknown_block",
+  "tests/test_graph.py::test_unknown_prerequisite",
+  "tests/test_trace.py::test_nested_steps_recorded_in_order",
+  "tests/test_trace.py::test_recordings_are_isolated",
+  "tests/test_trace.py::test_step_exposes_concept",
+  "tests/test_trace.py::test_step_outside_recording_raises",
+  "tests/test_trace.py::test_unknown_concept_rejected"
+]
