@@ -1,0 +1,217 @@
+# Concept graph for the linear algebra blocks.
+# A prerequisite X of concept Y means X must be mastered before Y.
+# Sources:
+#   М — Морохович В.С. Вища математика. Алгебра та аналітична геометрія. Ч. I. Ужгород, 2025.
+#   С — Совга Т.С. Основи вищої математики. Ч. 1. Ужгород, 2024.
+#   Ст — Стороженко І.П. Вища математика. Ч. I. Лінійна алгебра і аналітична геометрія.
+#        Харків, ХНТУСГ, 2019. Used for eigenvalues only: М and С do not cover them. The topic
+#        has no section number there, so the source names pages and exercises.
+
+concepts:
+  # --- Матриці ---
+  - id: matrix_basics
+    name_uk: Матриця, розмір, види матриць
+    name_en: Matrix, size, matrix types
+    block: matrices
+    prerequisites: []
+    source: М §1.1
+
+  - id: matrix_linear_ops
+    name_uk: Додавання матриць і множення на число
+    name_en: Matrix addition and scalar multiplication
+    block: matrices
+    prerequisites: [matrix_basics]
+    source: М §1.1
+
+  - id: matrix_transpose
+    name_uk: Транспонування матриці
+    name_en: Matrix transpose
+    block: matrices
+    prerequisites: [matrix_basics]
+    source: М §1.1
+
+  - id: matrix_mult
+    name_uk: Множення матриць
+    name_en: Matrix multiplication
+    block: matrices
+    prerequisites: [matrix_basics]
+    source: М §1.1
+
+  - id: matrix_polynomial
+    name_uk: Степінь матриці, многочлен від матриці
+    name_en: Matrix power, polynomial of a matrix
+    block: matrices
+    prerequisites: [matrix_linear_ops, matrix_mult]
+    source: М §1.1
+
+  # --- Визначники ---
+  - id: det_2x2
+    name_uk: Визначник 2-го порядку
+    name_en: 2×2 determinant
+    block: determinants
+    prerequisites: [matrix_basics]
+    source: М §1.2
+
+  - id: det_3x3_triangle
+    name_uk: Визначник 3-го порядку за правилом трикутників (Саррюса)
+    name_en: 3×3 determinant by the triangle (Sarrus) rule
+    block: determinants
+    prerequisites: [matrix_basics]
+    source: М §1.2; С розд. 1
+
+  - id: minor
+    name_uk: Мінор елемента
+    name_en: Minor of an entry
+    block: determinants
+    prerequisites: [det_2x2]
+    source: М §1.2
+
+  - id: cofactor_sign
+    name_uk: Знак алгебраїчного доповнення
+    name_en: Cofactor sign
+    block: determinants
+    prerequisites: [minor]
+    source: М §1.2
+
+  - id: cofactor_expansion
+    name_uk: Розклад визначника за рядком (стовпцем)
+    name_en: Cofactor (Laplace) expansion
+    block: determinants
+    prerequisites: [cofactor_sign]
+    source: М §1.2
+
+  - id: det_row_ops
+    name_uk: Зміна визначника при елементарних перетвореннях
+    name_en: Effect of row operations on the determinant
+    block: determinants
+    prerequisites: [det_2x2]
+    source: М §1.2
+
+  # --- Обернена матриця, ранг ---
+  - id: singularity
+    name_uk: Невироджена матриця (det ≠ 0)
+    name_en: Non-singular matrix (det ≠ 0)
+    block: matrices
+    prerequisites: [det_2x2]
+    source: М §1.3
+
+  - id: adjugate
+    name_uk: Союзна (приєднана) матриця
+    name_en: Adjugate matrix
+    block: matrices
+    prerequisites: [cofactor_sign, matrix_transpose]
+    source: М §1.3; С розд. 1
+
+  - id: inverse_matrix
+    name_uk: Обернена матриця
+    name_en: Inverse matrix
+    block: matrices
+    prerequisites: [singularity, adjugate]
+    source: М §1.3; С розд. 1
+
+  - id: matrix_equation
+    name_uk: Матричне рівняння
+    name_en: Matrix equation
+    block: matrices
+    prerequisites: [inverse_matrix, matrix_mult]
+    source: М §1.3
+
+  - id: elementary_row_ops
+    name_uk: Елементарні перетворення рядків
+    name_en: Elementary row operations
+    block: matrices
+    prerequisites: [matrix_basics]
+    source: М §1.3
+
+  - id: rank_elimination
+    name_uk: Ранг матриці методом елементарних перетворень
+    name_en: Matrix rank by row reduction
+    block: matrices
+    prerequisites: [elementary_row_ops]
+    source: М §1.3
+
+  - id: rank_minors
+    name_uk: Ранг матриці методом обвідних мінорів
+    name_en: Matrix rank by bordering minors
+    block: matrices
+    prerequisites: [minor]
+    source: М §1.3
+
+  # --- Системи лінійних рівнянь ---
+  - id: slae_matrix_form
+    name_uk: Основна і розширена матриці системи
+    name_en: Coefficient and augmented matrices of a system
+    block: linear_systems
+    prerequisites: [matrix_mult]
+    source: М §1.4
+
+  - id: kronecker_capelli
+    name_uk: Сумісність системи (теорема Кронекера–Капеллі)
+    name_en: Consistency of a system (Rouché–Capelli theorem)
+    block: linear_systems
+    prerequisites: [rank_elimination, slae_matrix_form]
+    source: М §1.4
+
+  - id: cramer_rule
+    name_uk: Формули Крамера
+    name_en: Cramer's rule
+    block: linear_systems
+    prerequisites: [slae_matrix_form, singularity]
+    source: М §1.4; С розд. 1
+
+  - id: matrix_method
+    name_uk: Матричний метод розв'язання системи
+    name_en: Matrix method (X = A⁻¹B)
+    block: linear_systems
+    prerequisites: [slae_matrix_form, inverse_matrix]
+    source: М §1.4; С розд. 1
+
+  - id: gauss_forward
+    name_uk: Прямий хід методу Гаусса
+    name_en: Gaussian elimination, forward pass
+    block: linear_systems
+    prerequisites: [elementary_row_ops, slae_matrix_form]
+    source: М §1.5; С розд. 1
+
+  - id: back_substitution
+    name_uk: Зворотний хід методу Гаусса
+    name_en: Back substitution
+    block: linear_systems
+    prerequisites: [gauss_forward]
+    source: М §1.5; С розд. 1
+
+  - id: homogeneous_system
+    name_uk: Однорідна система, умова ненульових розв'язків
+    name_en: Homogeneous system, condition for non-trivial solutions
+    block: linear_systems
+    prerequisites: [kronecker_capelli]
+    source: М §1.5
+
+  - id: fundamental_system
+    name_uk: Фундаментальна система розв'язків, загальний розв'язок
+    name_en: Fundamental system of solutions, general solution
+    block: linear_systems
+    prerequisites: [homogeneous_system, back_substitution]
+    source: М §1.5
+
+  # --- Власні значення ---
+  - id: characteristic_polynomial
+    name_uk: Характеристичний многочлен det(A − λE)
+    name_en: Characteristic polynomial det(A − λE)
+    block: eigenvalues
+    prerequisites: [det_2x2, matrix_linear_ops]
+    source: Ст с. 12–13
+
+  - id: eigenvalue
+    name_uk: Власне значення (корінь характеристичного рівняння)
+    name_en: Eigenvalue (root of the characteristic equation)
+    block: eigenvalues
+    prerequisites: [characteristic_polynomial]
+    source: Ст с. 12–13, 26; задачі 2.39–2.48
+
+  - id: eigenvector
+    name_uk: Власний вектор (ненульовий розв'язок (A − λE)X = 0)
+    name_en: Eigenvector (non-zero solution of (A − λE)X = 0)
+    block: eigenvalues
+    prerequisites: [eigenvalue, fundamental_system]
+    source: Ст с. 12–13, 26–27; задачі 2.39–2.51
