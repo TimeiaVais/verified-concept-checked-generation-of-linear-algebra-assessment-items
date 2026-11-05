@@ -43,11 +43,12 @@ repos:
         language_version: python3
 
   # Check the type annotations. Runs in the project's own environment, so it sees the dependencies.
+  # It calls the .venv directly: a Git window in an editor may not have poetry on its PATH.
   - repo: local
     hooks:
       - id: mypy
         name: mypy
-        entry: bash -c 'cd la-items && poetry run mypy src'
+        entry: bash -c 'cd la-items && .venv/bin/mypy src'
         language: system
         files: ^la-items/src/
         pass_filenames: false
@@ -57,4 +58,5 @@ repos:
     rev: acc9d9de6369b76d22cb4167029d2035e8730b98
     hooks:
       - id: gitlint
-        args: [--config, la-items/.gitlint]
+        # --config must come before --msg-filename, which takes the next argument as its value.
+        entry: gitlint --config la-items/.gitlint --staged --msg-filename
