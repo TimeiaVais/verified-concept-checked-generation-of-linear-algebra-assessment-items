@@ -1,0 +1,12 @@
+[general]
+ignore = body-is-missing
+regex-style-search = true
+
+[body-max-line-length]
+line-length=100
+
+[title-min-length]
+min-length = 10
+
+[title-max-length]
+line-length = 72

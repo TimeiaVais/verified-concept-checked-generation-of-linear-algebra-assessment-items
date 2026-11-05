@@ -1,0 +1,12 @@
+# Add these targets to the Makefile, and their names to its .PHONY line.
+
+# The API schema the app serves. Commit it: a test fails while it is stale.
+openapi:
+	@poetry run python -c "import json; \
+	from python_template.main import app; \
+	print(json.dumps(app.openapi(), indent=2))" > openapi.json
+
+# The database schema the migrations build, dumped from Postgres. Commit it: a test fails while it
+# is stale. Needs docker.
+schema:
+	@UPDATE_SCHEMA=1 poetry run pytest tests/test_schema.py -q --no-cov

@@ -1,0 +1,58 @@
+# Installed by `make bootstrap`; `make lint` runs every hook over the whole tree.
+---
+default_stages: [pre-commit]
+
+repos:
+  # Set the list of basic git hooks to find and fix common problems in the current working tree.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=2000"]
+      - id: check-executables-have-shebangs
+      - id: check-toml
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+
+  # Apply the code formatting tool to maintain a consistent style across the code base.
+  - repo: https://github.com/psf/black
+    rev: 4f1883b1f15305a0e83a7c87991f46292bf09f85  # frozen: 26.10.0
+    hooks:
+      - id: black
+        files: ^(src|tests|scripts)/
+        language_version: python3
+
+  # Sort imports into stdlib, third-party and local groups.
+  - repo: https://github.com/pycqa/isort
+    rev: 9f905615631c545f5aea2516508109350d1d2f7d  # frozen: 9.0.2
+    hooks:
+      - id: isort
+        files: ^(src|tests|scripts)/
+        language_version: python3
+
+  # Use the static code checker to find and fix logical errors in python source code.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: f12be1ebaa5351c1fc76472de98db2c3446c8253  # frozen: v0.16.10
+    hooks:
+      - id: ruff-check
+        files: ^(src|tests|scripts)/
+        language_version: python3
+
+  # Check the type annotations. Runs in the project's own environment, so it sees the dependencies.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: poetry run mypy src
+        language: system
+        files: ^src/
+        pass_filenames: false
+
+  # Check the commit messages on the current working tree.
+  - repo: https://github.com/jorisroovers/gitlint
+    rev: acc9d9de6369b76d22cb4167029d2035e8730b98
+    hooks:
+      - id: gitlint

@@ -1,0 +1,38 @@
+# Credentials: never commit them.
+.env
+.env.*
+!.env.example
+*.key
+.claude/jira.env
+.claude/jira.json
+
+# Local agent settings.
+.claude/settings.local.json
+
+# Python.
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tool caches and reports.
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Data and model files: large, and kept outside git (a storage bucket, DVC, a model registry).
+/data/
+/artifacts/
+
+# Local files.
+Makefile.local
+*.log
+tmp/
+.idea/
+.vscode/
+.DS_Store

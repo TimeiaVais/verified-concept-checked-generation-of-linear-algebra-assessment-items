@@ -1,0 +1,16 @@
+{
+  "site": "example.atlassian.net",
+  "cloud_id": "<from https://example.atlassian.net/_edge/tenant_info>",
+  "email": "<the Atlassian account email>",
+  "env_file": ".claude/jira.env",
+  "token_env": "ATLASSIAN_TOKEN",
+  "project": "ABC",
+  "epic": "ABC-100",
+  "issue_type": "Task",
+  "assign_to_self": true,
+  "branch": "ABC-NNNN-<summary as a lowercase slug>",
+  "notes": [
+    "Workflow: To Do -> In Progress -> Done; Cancel from any state.",
+    "Design docs live in docs/backlog/ and ADRs in docs/decisions/. Link only committed files."
+  ]
+}
