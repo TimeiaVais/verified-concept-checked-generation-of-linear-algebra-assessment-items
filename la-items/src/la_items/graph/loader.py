@@ -1,20 +1,25 @@
 """Load the concept graph and check its integrity."""
 
-from dataclasses import dataclass
-from pathlib import Path
+import dataclasses
+import pathlib
+import typing
 
 import yaml
 
-GRAPH_PATH = Path(__file__).with_name("concepts.yaml")
-BLOCKS = {"linear_systems", "matrices", "determinants", "eigenvalues"}
+__all__ = ["BLOCKS", "GRAPH_PATH", "Concept", "GraphError", "load_graph"]
+
+GRAPH_PATH: typing.Final = pathlib.Path(__file__).with_name("concepts.yaml")
+BLOCKS: typing.Final = frozenset({"linear_systems", "matrices", "determinants", "eigenvalues"})
 
 
 class GraphError(ValueError):
     pass
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class Concept:
+    """One node of the concept graph, as written in ``concepts.yaml``."""
+
     id: str
     name_uk: str
     name_en: str
@@ -23,9 +28,27 @@ class Concept:
     source: str
 
 
-def load_graph(path: Path = GRAPH_PATH) -> dict[str, Concept]:
+def load_graph(path: pathlib.Path = GRAPH_PATH) -> dict[str, Concept]:
+    """Read the graph file and check it.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        The YAML file with a ``concepts`` list.
+
+    Returns
+    -------
+    dict[str, Concept]
+        The concepts by id, in file order.
+
+    Raises
+    ------
+    GraphError
+        It raises on a duplicate id, an unknown block, an unknown or self prerequisite, or a cycle.
+    """
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     graph: dict[str, Concept] = {}
+
     for item in raw["concepts"]:
         concept = Concept(
             id=item["id"],
@@ -40,8 +63,10 @@ def load_graph(path: Path = GRAPH_PATH) -> dict[str, Concept]:
         if concept.block not in BLOCKS:
             raise GraphError(f"{concept.id}: unknown block {concept.block!r}")
         graph[concept.id] = concept
+
     _check_prerequisites(graph)
     _check_acyclic(graph)
+
     return graph
 
 
@@ -58,17 +83,20 @@ def _check_acyclic(graph: dict[str, Concept]) -> None:
     done: set[str] = set()
     on_path: list[str] = []
 
-    def visit(cid: str) -> None:
-        if cid in done:
-            return
-        if cid in on_path:
-            cycle = on_path[on_path.index(cid):] + [cid]
+    # Nested so the depth-first walk shares `done` and `on_path` without passing them down.
+    def visit(concept_id: str) -> None:
+        if concept_id in on_path:
+            cycle = on_path[on_path.index(concept_id) :] + [concept_id]
             raise GraphError("prerequisite cycle: " + " -> ".join(cycle))
-        on_path.append(cid)
-        for prereq in graph[cid].prerequisites:
-            visit(prereq)
-        on_path.pop()
-        done.add(cid)
 
-    for cid in graph:
-        visit(cid)
+        if concept_id not in done:
+            on_path.append(concept_id)
+
+            for prereq in graph[concept_id].prerequisites:
+                visit(prereq)
+
+            on_path.pop()
+            done.add(concept_id)
+
+    for concept_id in graph:
+        visit(concept_id)

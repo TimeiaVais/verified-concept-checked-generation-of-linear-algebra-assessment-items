@@ -1,22 +1,77 @@
+[build-system]
+requires = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
+
 [project]
 name = "la-items"
 version = "0.1.0"
+description = "Verified, concept-checked generation of linear algebra assessment items"
 requires-python = ">=3.11"
 dependencies = ["pyyaml>=6", "sympy>=1.12"]
 
-[project.optional-dependencies]
-dev = ["pytest>=8"]
+# Command line entry points call into the package; scripts hold no logic of their own.
+# [project.scripts]
+# la-items = "la_items.cli:main"
 
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+[tool.poetry]
+packages = [
+    { include = "la_items", from = "src" },
+]
 
-[tool.setuptools]
-packages = ["contracts", "graph", "steplib"]
+[tool.poetry.group.dev]
+optional = true
 
-[tool.setuptools.package-data]
-graph = ["concepts.yaml"]
+[tool.poetry.group.dev.dependencies]
+black = ">=23.0.0"
+isort = ">=5.0.0"
+mypy = ">=1.5.0"
+pre-commit = ">=3.0.0"
+ruff = ">=0.5.0"
+
+[tool.poetry.group.tests]
+optional = true
+
+[tool.poetry.group.tests.dependencies]
+coverage = ">=7.0.0"
+pytest = ">=8.0.0"
+pytest-cov = ">=4.0.0"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+# First-party packages are found under these folders, so a rename needs no change here.
+src_paths = ["src", "tests"]
+
+[tool.mypy]
+# Prohibit definition of functions without type annotations or with incomplete type annotations.
+disallow_untyped_defs = true
+
+exclude = "(^tests/|\\.pyi$)"
+
+# Suppress import error messages that cannot be resolved.
+ignore_missing_imports = true
+
+# Enable strict optional checks.
+strict_optional = true
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
 testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = ["slow: slow tests, or tests that need a network or other external service"]
+
+[tool.ruff]
+exclude = ["*.pyi"]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["A", "B", "C", "E", "F", "N", "W"]
+# Exceptions are named for the condition they report (`UnknownClient`, `LastAdmin`), not with an
+# Error suffix.
+ignore = ["N818"]
