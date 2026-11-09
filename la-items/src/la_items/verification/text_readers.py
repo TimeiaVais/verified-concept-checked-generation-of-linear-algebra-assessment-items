@@ -13,7 +13,7 @@ import sympy
 
 from la_items import contracts
 
-__all__ = ["DeterminantCofactorTextReader", "LinearSystemGaussianTextReader"]
+__all__ = ["DeterminantCofactorTextReader", "EigenvaluesTextReader", "LinearSystemTextReader"]
 
 _ORDINALS: typing.Final = {
     "uk": {"першим": 1, "другим": 2, "третім": 3},
@@ -27,6 +27,16 @@ def _match_template(pattern: str, text: str) -> re.Match[str]:
         raise ValueError(f"text does not follow the template: {text!r}")
 
     return match
+
+
+def _read_integer_matrix(matrix_text: str) -> sympy.ImmutableMatrix:
+    """Read "[[1, -2], [3, 4]]" with `ast.literal_eval`, which evaluates literals only."""
+    rows = ast.literal_eval(matrix_text)
+    if not all(isinstance(entry, int) for row in rows for entry in row):
+        raise ValueError(f"matrix entries are not integers: {matrix_text!r}")
+    matrix = sympy.ImmutableMatrix(rows)
+
+    return matrix
 
 
 class DeterminantCofactorTextReader:
@@ -44,10 +54,7 @@ class DeterminantCofactorTextReader:
         row_word, matrix_text = match.groups()
         if row_word not in _ORDINALS[language]:
             raise ValueError(f"unknown row ordinal {row_word!r}")
-        rows = ast.literal_eval(matrix_text)
-        if not all(isinstance(entry, int) for row in rows for entry in row):
-            raise ValueError(f"matrix entries are not integers: {matrix_text!r}")
-        matrix = sympy.ImmutableMatrix(rows)
+        matrix = _read_integer_matrix(matrix_text)
         reading = contracts.TextReading(
             parameters={"A": matrix},
             method=f"cofactor_row_{_ORDINALS[language][row_word]}",
@@ -57,18 +64,39 @@ class DeterminantCofactorTextReader:
         return reading
 
 
-class LinearSystemGaussianTextReader:
-    """Read "solve the system by Gaussian elimination: ax + by = c; dx + ey = f"."""
+class LinearSystemTextReader:
+    """Read "solve the system by <method>: ax + by = c; dx + ey = f" for either method.
 
-    expected_method = "gaussian_elimination"
+    One reader knows both method templates, so a family whose text names the other method fails
+    with a method mismatch, not with unreadable text.
+    """
+
     _templates: typing.Final = {
-        "uk": r"Розв'яжіть систему методом Гаусса: (.*)\.",
-        "en": r"Solve the system by Gaussian elimination: (.*)\.",
+        "gaussian_elimination": {
+            "uk": r"Розв'яжіть систему методом Гаусса: (.*)\.",
+            "en": r"Solve the system by Gaussian elimination: (.*)\.",
+        },
+        "cramer_rule": {
+            "uk": r"Розв'яжіть систему за формулами Крамера: (.*)\.",
+            "en": r"Solve the system by Cramer's rule: (.*)\.",
+        },
     }
 
+    def __init__(self, expected_method: str) -> None:
+        if expected_method not in self._templates:
+            raise ValueError(f"unknown method {expected_method!r}")
+        self.expected_method = expected_method
+
     def read_question(self, text: str, language: contracts.Language) -> contracts.TextReading:
-        """Parse the two equations, then solve them with `sympy.linsolve`."""
-        match = _match_template(self._templates[language], text)
+        """Find which method template the text follows, parse the equations, solve with linsolve."""
+        matches = {
+            method: re.fullmatch(templates[language], text)
+            for method, templates in self._templates.items()
+        }
+        found = [(method, match) for method, match in matches.items() if match is not None]
+        if not found:
+            raise ValueError(f"text does not follow a system template: {text!r}")
+        method, match = found[0]
         equations = [self._read_equation(equation) for equation in match.group(1).split("; ")]
         if len(equations) != 2:
             raise ValueError(f"expected 2 equations, got {len(equations)}")
@@ -78,7 +106,7 @@ class LinearSystemGaussianTextReader:
         (solution,) = sympy.linsolve((coefficients, constants), x, y)
         reading = contracts.TextReading(
             parameters={"A": coefficients, "b": constants},
-            method="gaussian_elimination",
+            method=method,
             answer=sympy.ImmutableMatrix(solution),
         )
 
@@ -105,3 +133,33 @@ class LinearSystemGaussianTextReader:
         )
 
         return row_and_constant
+
+
+class EigenvaluesTextReader:
+    """Read "find the eigenvalues of A using the characteristic polynomial, A = [[...]]"."""
+
+    expected_method = "characteristic_polynomial"
+    _templates: typing.Final = {
+        "uk": (
+            r"Знайдіть власні значення матриці A за допомогою характеристичного многочлена,"
+            r" A = (\[.*\])\. Запишіть їх у порядку зростання\."
+        ),
+        "en": (
+            r"Find the eigenvalues of A using the characteristic polynomial, A = (\[.*\])\."
+            r" List them in increasing order\."
+        ),
+    }
+
+    def read_question(self, text: str, language: contracts.Language) -> contracts.TextReading:
+        """Parse the matrix, then solve det(A − λE) = 0 with `sympy.solve`, in increasing order."""
+        match = _match_template(self._templates[language], text)
+        matrix = _read_integer_matrix(match.group(1))
+        lam = sympy.Symbol("lambda")
+        roots = sympy.solve((matrix - lam * sympy.eye(2)).det(), lam)
+        reading = contracts.TextReading(
+            parameters={"A": matrix},
+            method="characteristic_polynomial",
+            answer=sympy.ImmutableMatrix(sorted(roots)),
+        )
+
+        return reading

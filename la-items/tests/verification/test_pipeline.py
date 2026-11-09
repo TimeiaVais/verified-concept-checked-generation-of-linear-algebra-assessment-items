@@ -4,7 +4,7 @@ import pytest
 import sympy
 
 from la_items import contracts
-from la_items.families import determinants, linear_systems
+from la_items.families import determinants, eigenvalues, linear_systems
 from la_items.steplib import determinants as determinant_steps
 from la_items.verification import parameters, pipeline, text_readers
 
@@ -12,8 +12,12 @@ Parameters = collections.abc.Mapping[str, sympy.Basic]
 
 DETERMINANT = determinants.Determinant3x3CofactorRow1
 SYSTEM = linear_systems.Solve2x2LinearSystemGaussian
+CRAMER = linear_systems.Solve2x2LinearSystemCramer
+EIGENVALUES = eigenvalues.Eigenvalues2x2CharacteristicPolynomial
 DETERMINANT_READER = text_readers.DeterminantCofactorTextReader()
-SYSTEM_READER = text_readers.LinearSystemGaussianTextReader()
+SYSTEM_READER = text_readers.LinearSystemTextReader("gaussian_elimination")
+CRAMER_READER = text_readers.LinearSystemTextReader("cramer_rule")
+EIGENVALUES_READER = text_readers.EigenvaluesTextReader()
 ONES = sympy.ImmutableMatrix.ones(3, 3)
 
 
@@ -22,8 +26,13 @@ ONES = sympy.ImmutableMatrix.ones(3, 3)
 
 @pytest.mark.parametrize(
     ("family", "reader"),
-    [(DETERMINANT(), DETERMINANT_READER), (SYSTEM(), SYSTEM_READER)],
-    ids=["determinant", "system"],
+    [
+        (DETERMINANT(), DETERMINANT_READER),
+        (SYSTEM(), SYSTEM_READER),
+        (CRAMER(), CRAMER_READER),
+        (EIGENVALUES(), EIGENVALUES_READER),
+    ],
+    ids=["determinant", "gauss", "cramer", "eigenvalues"],
 )
 def test_real_families_pass_every_stage_on_200_seeds(
     family: contracts.ItemFamily, reader: contracts.TextReader
@@ -153,6 +162,44 @@ class WrongBySameOne(DETERMINANT):
         return parameters["A"].det() + 1
 
 
+class GaussAsksForCramer(SYSTEM):
+    """The program eliminates, but the text asks for Cramer's rule."""
+
+    def render_question(self, parameters: Parameters, language: contracts.Language) -> str:
+        question = super().render_question(parameters, language)
+        return question.replace("методом Гаусса", "за формулами Крамера").replace(
+            "by Gaussian elimination", "by Cramer's rule"
+        )
+
+
+class SingularCramer(CRAMER):
+    sample_parameters = fixed_parameters(A=[[1, 2], [2, 4]], b=[[3], [6]])
+
+
+class SingularCramerUnchecked(SingularCramer):
+    """The family check misses det A = 0, so the singularity step itself must refuse."""
+
+    def find_parameter_problem(self, parameters: Parameters) -> None:
+        return None
+
+
+class RepeatedEigenvalue(EIGENVALUES):
+    sample_parameters = fixed_parameters(A=[[2, 0], [0, 2]])
+
+
+class ComplexEigenvalues(EIGENVALUES):
+    sample_parameters = fixed_parameters(A=[[0, -1], [1, 0]])
+
+
+class IrrationalEigenvalues(EIGENVALUES):
+    sample_parameters = fixed_parameters(A=[[1, 1], [1, 0]])
+
+
+class EigenvaluesDropsMinus(EIGENVALUES):
+    def render_question(self, parameters: Parameters, language: contracts.Language) -> str:
+        return super().render_question(parameters, language).replace("-", "")
+
+
 class BypassesSteps(DETERMINANT):
     def solve(self, parameters: Parameters) -> sympy.Basic:
         return parameters["A"].det()
@@ -197,6 +244,23 @@ class BypassesSteps(DETERMINANT):
         ),
         (OffTemplateText(), DETERMINANT_READER, "text_program_agreement", "text_unreadable"),
         (WrongBySameOne(), DETERMINANT_READER, "text_program_agreement", "text_answer_mismatch"),
+        (GaussAsksForCramer(), SYSTEM_READER, "text_program_agreement", "text_method_mismatch"),
+        (SingularCramer(), CRAMER_READER, "parameter_validity", "answer_not_unique"),
+        (SingularCramerUnchecked(), CRAMER_READER, "parameter_validity", "degenerate_parameters"),
+        (RepeatedEigenvalue(), EIGENVALUES_READER, "parameter_validity", "degenerate_parameters"),
+        (ComplexEigenvalues(), EIGENVALUES_READER, "parameter_validity", "degenerate_parameters"),
+        (
+            IrrationalEigenvalues(),
+            EIGENVALUES_READER,
+            "parameter_validity",
+            "degenerate_parameters",
+        ),
+        (
+            EigenvaluesDropsMinus(),
+            EIGENVALUES_READER,
+            "text_program_agreement",
+            "text_parameters_mismatch",
+        ),
         (BypassesSteps(), DETERMINANT_READER, "concept_check", "concept_mismatch"),
     ],
     ids=lambda value: type(value).__name__ if hasattr(value, "solve") else None,
@@ -255,10 +319,31 @@ def test_fraction_answer_passes() -> None:
     ],
 )
 def test_system_reader_reads_equations(equation: str, expected: tuple[list[int], int]) -> None:
-    assert text_readers.LinearSystemGaussianTextReader._read_equation(equation) == expected
+    assert text_readers.LinearSystemTextReader._read_equation(equation) == expected
 
 
 @pytest.mark.parametrize("equation", ["2x + 3x = 1", "2z + y = 1", "2x + y", "__import__('os')"])
 def test_system_reader_rejects_off_template_equations(equation: str) -> None:
     with pytest.raises(ValueError):
-        text_readers.LinearSystemGaussianTextReader._read_equation(equation)
+        text_readers.LinearSystemTextReader._read_equation(equation)
+
+
+def test_system_reader_rejects_an_unknown_method() -> None:
+    with pytest.raises(ValueError, match="unknown method"):
+        text_readers.LinearSystemTextReader("matrix_method")
+
+
+class CramerOnGaussSystems(CRAMER):
+    sample_parameters = SYSTEM.sample_parameters
+    find_parameter_problem = SYSTEM.find_parameter_problem
+
+
+def test_gauss_and_cramer_give_the_same_answer_with_different_concepts() -> None:
+    gauss = pipeline.verify_variant(SYSTEM(), SYSTEM_READER, 5)
+    cramer = pipeline.verify_variant(CramerOnGaussSystems(), CRAMER_READER, 5)
+
+    assert gauss.variant is not None and cramer.variant is not None
+    assert gauss.variant.parameters == cramer.variant.parameters
+    assert gauss.variant.answer == cramer.variant.answer
+    assert gauss.concept_check is not None and cramer.concept_check is not None
+    assert gauss.concept_check.derived != cramer.concept_check.derived

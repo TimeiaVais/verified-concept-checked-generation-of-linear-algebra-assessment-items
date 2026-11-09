@@ -54,3 +54,29 @@ def test_zero_pivot_rejected() -> None:
 def test_singular_system_rejected() -> None:
     with trace.recording(), pytest.raises(ValueError, match="no unique solution"):
         linear_systems.back_substitution_2x2(sympy.ImmutableMatrix([[1, 2, 3], [0, 0, 1]]))
+
+
+def test_cramer_rule() -> None:
+    with trace.recording() as recorded:
+        solution = linear_systems.cramer_rule_2x2(
+            sympy.ImmutableMatrix([[2, 1], [4, -3]]), sympy.ImmutableMatrix([5, -5])
+        )
+
+    assert solution == sympy.ImmutableMatrix([1, 3])
+    assert recorded == ["cramer_rule", "singularity", "det_2x2", "det_2x2", "det_2x2"]
+
+
+def test_cramer_rule_keeps_fractions_exact() -> None:
+    with trace.recording():
+        solution = linear_systems.cramer_rule_2x2(
+            sympy.ImmutableMatrix([[3, 1], [1, 2]]), sympy.ImmutableMatrix([1, 0])
+        )
+
+    assert solution == sympy.ImmutableMatrix([sympy.Rational(2, 5), sympy.Rational(-1, 5)])
+
+
+def test_singular_matrix_rejected_by_cramer() -> None:
+    with trace.recording(), pytest.raises(ValueError, match="det A = 0"):
+        linear_systems.cramer_rule_2x2(
+            sympy.ImmutableMatrix([[1, 2], [2, 4]]), sympy.ImmutableMatrix([3, 6])
+        )

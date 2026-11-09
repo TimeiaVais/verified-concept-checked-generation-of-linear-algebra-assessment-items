@@ -17,16 +17,25 @@ reference solver executed, not from a tag. The users are the course teachers and
   `loader.load_graph()` reads it and rejects duplicates, unknown blocks, unknown prerequisites and
   cycles. Depends on `pyyaml` only.
 - `la_items.steplib`: the step library. `trace.step(concept_id)` binds a step to one graph concept;
-  `trace.recording()` collects the concepts of the steps called inside it. `determinants` holds
-  the steps `det_2x2`, `minor`, `cofactor_sign` and `cofactor_expansion` (3×3, first row).
-  `linear_systems` holds the Gaussian elimination steps for a 2×2 system. Depends on
-  `la_items.graph` and `sympy`.
-- `la_items.families`: item families. Each one implements `contracts.ItemFamily`.
-  `determinants.Determinant3x3CofactorRow1` and `linear_systems.Solve2x2LinearSystemGaussian` are
-  hand-written. Depends on `la_items.steplib` and `la_items.contracts`.
+  `trace.recording()` collects the concepts of the steps called inside it. Four procedures:
+  - `determinants`: `det_2x2`, `minor`, `cofactor_sign`, `cofactor_expansion` (3×3, first row);
+  - `linear_systems`: Gaussian elimination of a 2×2 system (`augmented_matrix`,
+    `add_row_multiple`, `forward_elimination_2x2`, `back_substitution_2x2`);
+  - `linear_systems`: Cramer's rule for a 2×2 system (`check_nonsingular`, `cramer_rule_2x2`);
+  - `eigenvalues`: eigenvalues of a 2×2 matrix (`subtract_lambda_identity`,
+    `characteristic_polynomial_2x2`, `eigenvalues_2x2`).
+
+  Depends on `la_items.graph` and `sympy`.
+- `la_items.families`: item families, all hand-written. Each one implements
+  `contracts.ItemFamily`: `determinants.Determinant3x3CofactorRow1`,
+  `linear_systems.Solve2x2LinearSystemGaussian`, `linear_systems.Solve2x2LinearSystemCramer`,
+  `eigenvalues.Eigenvalues2x2CharacteristicPolynomial`. Gauss and Cramer solve the same kind of
+  system with different concepts, so the question text names the method. Depends on
+  `la_items.steplib` and `la_items.contracts`.
 - `la_items.verification`: the verification pipeline. `pipeline.verify_variant()` and
-  `verify_family()` run the four stages; `parameters` holds stage 1; `text_readers` holds one text
-  reader per family for stage 3. Depends on `la_items.steplib` and `la_items.contracts`, not on
+  `verify_family()` run the four stages; `parameters` holds stage 1; `text_readers` holds the text
+  readers for stage 3: one for determinants, one for eigenvalues, and one for 2×2 systems that
+  knows the Gauss and the Cramer template. Depends on `la_items.steplib` and `la_items.contracts`, not on
   `la_items.families`, so a reader cannot reuse a family's rendering.
 - `la_items.contracts`: the data structures that item families, verification and generation share
   (`ConceptVector`, `ErrorRule`, `Variant`, `Distractor`, `ConceptCheck`, `CheckFailure`,
