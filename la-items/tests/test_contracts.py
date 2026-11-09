@@ -52,14 +52,22 @@ def test_concept_check_reports_missing_and_extra() -> None:
 def test_variant_rejects_mutable_matrix() -> None:
     with pytest.raises(TypeError, match="parameter 'A'"):
         contracts.Variant(
-            seed=1, parameters={"A": sympy.Matrix([[1]])}, question_text="", answer=sympy.Integer(1)
+            seed=1,
+            parameters={"A": sympy.Matrix([[1]])},
+            question_uk="",
+            question_en="",
+            answer=sympy.Integer(1),
         )
 
 
 def test_variant_and_distractor_accept_sympy_objects() -> None:
     matrix = sympy.ImmutableMatrix([[1, 2], [3, 4]])
     variant = contracts.Variant(
-        seed=1, parameters={"A": matrix}, question_text="det A?", answer=matrix.det()
+        seed=1,
+        parameters={"A": matrix},
+        question_uk="det A?",
+        question_en="det A?",
+        answer=matrix.det(),
     )
     distractor = contracts.Distractor(
         answer=sympy.Integer(10), error_rule=contracts.ErrorRule("det2_plus", "det_2x2")

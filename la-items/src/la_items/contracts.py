@@ -13,9 +13,20 @@ import sympy
 
 from la_items.graph import loader
 
-__all__ = ["CONCEPTS", "ConceptCheck", "ConceptVector", "Distractor", "ErrorRule", "Variant"]
+__all__ = [
+    "CONCEPTS",
+    "ConceptCheck",
+    "ConceptVector",
+    "Distractor",
+    "ErrorRule",
+    "ItemFamily",
+    "Language",
+    "Variant",
+]
 
 CONCEPTS: typing.Final = loader.load_graph()
+
+Language = typing.Literal["uk", "en"]
 
 
 def _check_concept(concept_id: str) -> None:
@@ -87,7 +98,8 @@ class Variant:
 
     seed: int
     parameters: collections.abc.Mapping[str, sympy.Basic]
-    question_text: str
+    question_uk: str
+    question_en: str
     answer: sympy.Basic
 
     def __post_init__(self) -> None:
@@ -135,3 +147,34 @@ class ConceptCheck:
         is_accepted = self.requested == self.derived
 
         return is_accepted
+
+
+class ItemFamily(typing.Protocol):
+    """The one API every item family implements, hand-written or generated.
+
+    `render_question` takes the sampled parameters, never the seed, so both languages of a
+    variant always show the same numbers.
+    """
+
+    name: str
+    target_concepts: ConceptVector
+
+    def sample_parameters(self, seed: int) -> dict[str, sympy.Basic]:
+        """Sample the parameters of one variant from an explicit seed."""
+        ...
+
+    def render_question(
+        self, parameters: collections.abc.Mapping[str, sympy.Basic], language: Language
+    ) -> str:
+        """Render the question text in one language."""
+        ...
+
+    def solve(self, parameters: collections.abc.Mapping[str, sympy.Basic]) -> sympy.Basic:
+        """Compute the answer through step library calls only, so the trace records it."""
+        ...
+
+    def compute_reference_answer(
+        self, parameters: collections.abc.Mapping[str, sympy.Basic]
+    ) -> sympy.Basic:
+        """Compute the answer by an independent method, without the step library."""
+        ...
