@@ -17,8 +17,9 @@ reference solver executed, not from a tag. The users are the course teachers and
   `loader.load_graph()` reads it and rejects duplicates, unknown blocks, unknown prerequisites and
   cycles. Depends on `pyyaml` only.
 - `la_items.steplib`: the step library. `trace.step(concept_id)` binds a step to one graph concept;
-  `trace.recording()` collects the concepts of the steps called inside it. Depends on
-  `la_items.graph`.
+  `trace.recording()` collects the concepts of the steps called inside it. `determinants` holds
+  the steps `det_2x2`, `minor`, `cofactor_sign` and `cofactor_expansion` (3×3, first row).
+  Depends on `la_items.graph` and `sympy`.
 - `la_items.contracts`: the data structures that item families, verification and generation share
   (`ConceptVector`, `ErrorRule`, `Variant`, `Distractor`, `ConceptCheck`). Each one that holds a
   concept id rejects an id not in the graph. Depends on `la_items.graph` and `sympy`.
