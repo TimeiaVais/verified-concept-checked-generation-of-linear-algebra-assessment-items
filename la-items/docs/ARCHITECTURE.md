@@ -23,20 +23,36 @@ reference solver executed, not from a tag. The users are the course teachers and
   `la_items.graph` and `sympy`.
 - `la_items.families`: item families. Each one implements `contracts.ItemFamily`.
   `determinants.Determinant3x3CofactorRow1` and `linear_systems.Solve2x2LinearSystemGaussian` are
-  hand-written. `verification.build_variant()` runs any family. Depends on `la_items.steplib` and
-  `la_items.contracts`.
+  hand-written. Depends on `la_items.steplib` and `la_items.contracts`.
+- `la_items.verification`: the verification pipeline. `pipeline.verify_variant()` and
+  `verify_family()` run the four stages; `parameters` holds stage 1; `text_readers` holds one text
+  reader per family for stage 3. Depends on `la_items.steplib` and `la_items.contracts`, not on
+  `la_items.families`, so a reader cannot reuse a family's rendering.
 - `la_items.contracts`: the data structures that item families, verification and generation share
-  (`ConceptVector`, `ErrorRule`, `Variant`, `Distractor`, `ConceptCheck`) and the `ItemFamily`
-  protocol. Each structure that holds a concept id rejects an id not in the graph. Depends on `la_items.graph` and `sympy`.
+  (`ConceptVector`, `ErrorRule`, `Variant`, `Distractor`, `ConceptCheck`, `CheckFailure`,
+  `VerificationReport`, `TextReading`) and the `ItemFamily` and `TextReader` protocols. Each
+  structure that holds a concept id rejects an id not in the graph. Depends on `la_items.graph`
+  and `sympy`.
 
 ## Data and flows
 
-1. `concepts.yaml` is loaded once per module that needs it (`steplib.trace`, `contracts`).
-2. `build_variant(family, seed)` samples the parameters once and renders the Ukrainian and the
-   English question from the same parameters.
-3. The family's `solve` runs inside `recording()`. Each step it calls appends its concept id.
-4. The answer must equal `compute_reference_answer`, an independent SymPy computation.
-5. `ConceptVector.from_trace()` turns the trace into the derived vector, and
-   `ConceptCheck(target_concepts, derived)` accepts the variant only when both are equal.
+`verify_variant(family, reader, seed)` runs these stages in order and stops at the first failure.
+The report holds the failure as a `CheckFailure`: the stage, a reason code from `contracts.Reason`
+and a detail with the numbers.
 
-Error rules, the text-only solver check and LLM generation are not built yet.
+1. **Parameter validity.** The family samples the parameters once. The pipeline checks their names
+   and shapes against `parameter_shapes`, entries within ±100, and the family's own
+   `find_parameter_problem` (degenerate cases, a non-unique answer). Then `solve` runs inside
+   `recording()`; a step that raises, a division by zero, or an answer that is not finite, too
+   large or too long fails this stage.
+2. **Independent recomputation.** `compute_reference_answer` runs inside `recording()` too: it must
+   record no steps, and it must give the same answer.
+3. **Text-program agreement.** The Ukrainian and the English question are rendered from the same
+   parameters. The reader parses each text alone. Both languages must read the same, the text must
+   show the program's parameters and the family's method, and the reader's own answer must match.
+4. **Concept check.** `ConceptVector.from_trace()` turns the trace of stage 1 into the derived
+   vector; it must equal `target_concepts`.
+
+`concepts.yaml` is loaded once per module that needs it (`steplib.trace`, `contracts`).
+
+Error rules and LLM generation are not built yet.

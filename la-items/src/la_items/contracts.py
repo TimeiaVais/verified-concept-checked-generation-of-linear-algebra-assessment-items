@@ -15,18 +15,52 @@ from la_items.graph import loader
 
 __all__ = [
     "CONCEPTS",
+    "CheckFailure",
     "ConceptCheck",
     "ConceptVector",
     "Distractor",
     "ErrorRule",
     "ItemFamily",
     "Language",
+    "ParameterProblem",
+    "ParameterReason",
+    "Reason",
+    "Stage",
+    "TextReader",
+    "TextReading",
     "Variant",
+    "VerificationReport",
 ]
 
 CONCEPTS: typing.Final = loader.load_graph()
 
 Language = typing.Literal["uk", "en"]
+
+# The verification stages, in the order the pipeline runs them.
+Stage = typing.Literal[
+    "parameter_validity",
+    "independent_recomputation",
+    "text_program_agreement",
+    "concept_check",
+]
+ParameterReason = typing.Literal["degenerate_parameters", "answer_not_unique"]
+Reason = (
+    ParameterReason
+    | typing.Literal[
+        "wrong_shape",
+        "number_too_large",
+        "division_by_zero",
+        "expression_too_large",
+        "reference_mismatch",
+        "reference_uses_step_library",
+        "text_unreadable",
+        "text_parameters_mismatch",
+        "text_method_mismatch",
+        "language_mismatch",
+        "text_answer_mismatch",
+        "concept_mismatch",
+    ]
+)
 
 
 def _check_concept(concept_id: str) -> None:
@@ -149,6 +183,69 @@ class ConceptCheck:
         return is_accepted
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class ParameterProblem:
+    """A family-specific reason why sampled parameters must not become an item."""
+
+    reason: ParameterReason
+    detail: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class CheckFailure:
+    """The first check a variant failed: which stage, a stable reason code, and the numbers."""
+
+    stage: Stage
+    reason: Reason
+    detail: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class VerificationReport:
+    """The outcome of the verification pipeline for one seed of one family.
+
+    `variant` is set once the question is rendered, `concept_check` once the concept check runs.
+    """
+
+    family_name: str
+    seed: int
+    variant: Variant | None
+    concept_check: ConceptCheck | None
+    failure: CheckFailure | None
+
+    @property
+    def is_accepted(self) -> bool:
+        """Whether every stage passed."""
+        is_accepted = self.failure is None
+
+        return is_accepted
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class TextReading:
+    """What a text reader found in a rendered question, and its own answer to it."""
+
+    parameters: collections.abc.Mapping[str, sympy.Basic]
+    method: str
+    answer: sympy.Basic
+
+
+class TextReader(typing.Protocol):
+    """A family-specific reader of rendered questions, written apart from the family.
+
+    It sees only the text. It must not import the family, or it would repeat a rendering mistake.
+    """
+
+    expected_method: str
+
+    def read_question(self, text: str, language: Language) -> TextReading:
+        """Parse a question written from the family's controlled template and solve it.
+
+        It raises ValueError when the text does not follow the template.
+        """
+        ...
+
+
 class ItemFamily(typing.Protocol):
     """The one API every item family implements, hand-written or generated.
 
@@ -158,9 +255,16 @@ class ItemFamily(typing.Protocol):
 
     name: str
     target_concepts: ConceptVector
+    parameter_shapes: collections.abc.Mapping[str, tuple[int, int]]
 
     def sample_parameters(self, seed: int) -> dict[str, sympy.Basic]:
         """Sample the parameters of one variant from an explicit seed."""
+        ...
+
+    def find_parameter_problem(
+        self, parameters: collections.abc.Mapping[str, sympy.Basic]
+    ) -> ParameterProblem | None:
+        """Find an unexpected degenerate case or a non-unique answer, or return None."""
         ...
 
     def render_question(

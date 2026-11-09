@@ -20,26 +20,47 @@ class Solve2x2LinearSystemGaussian:
     target_concepts = contracts.ConceptVector(
         frozenset({"slae_matrix_form", "elementary_row_ops", "gauss_forward", "back_substitution"})
     )
+    parameter_shapes = {"A": (2, 2), "b": (2, 1)}
 
     def sample_parameters(self, seed: int) -> dict[str, sympy.Basic]:
-        """Sample an integer solution and a matrix A, then set b = A·(x, y).
-
-        A has det A ≠ 0, so the solution is unique, and a₁₁ ≠ 0, a₂₁ ≠ 0, so the solution needs
-        exactly one elimination step and its trace matches the target concepts.
-        """
+        """Sample a matrix A until `find_parameter_problem` accepts it, then set b = A·(x, y)."""
         rng = random.Random(seed)
-        coefficients = sympy.ImmutableMatrix.zeros(2, 2)
-
-        while coefficients.det() == 0 or coefficients[0, 0] == 0 or coefficients[1, 0] == 0:
-            coefficients = sympy.ImmutableMatrix(2, 2, lambda i, j: rng.randint(-5, 5))
-
-        solution = sympy.ImmutableMatrix(2, 1, lambda i, j: rng.randint(-5, 5))
         parameters: dict[str, sympy.Basic] = {
-            "A": coefficients,
-            "b": sympy.ImmutableMatrix(coefficients * solution),
+            "A": sympy.ImmutableMatrix.zeros(2, 2),
+            "b": sympy.ImmutableMatrix.zeros(2, 1),
         }
 
+        while self.find_parameter_problem(parameters) is not None:
+            coefficients = sympy.ImmutableMatrix(2, 2, lambda i, j: rng.randint(-5, 5))
+            solution = sympy.ImmutableMatrix(2, 1, lambda i, j: rng.randint(-5, 5))
+            parameters = {"A": coefficients, "b": sympy.ImmutableMatrix(coefficients * solution)}
+
         return parameters
+
+    def find_parameter_problem(
+        self, parameters: collections.abc.Mapping[str, sympy.Basic]
+    ) -> contracts.ParameterProblem | None:
+        """Require det A ≠ 0, so the solution is unique, and a₁₁ ≠ 0, a₂₁ ≠ 0.
+
+        With a₁₁ ≠ 0 and a₂₁ ≠ 0 the solution needs exactly one elimination step, so its trace
+        matches the target concepts.
+        """
+        coefficients = parameters["A"]
+
+        if coefficients.det() == 0:
+            problem: contracts.ParameterProblem | None = contracts.ParameterProblem(
+                "answer_not_unique", f"det A = 0 for A = {coefficients.tolist()}"
+            )
+
+        elif coefficients[0, 0] == 0 or coefficients[1, 0] == 0:
+            problem = contracts.ParameterProblem(
+                "degenerate_parameters", f"a11 or a21 is zero in A = {coefficients.tolist()}"
+            )
+
+        else:
+            problem = None
+
+        return problem
 
     def render_question(
         self, parameters: collections.abc.Mapping[str, sympy.Basic], language: contracts.Language

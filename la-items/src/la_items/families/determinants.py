@@ -18,15 +18,30 @@ class Determinant3x3CofactorRow1:
     target_concepts = contracts.ConceptVector(
         frozenset({"cofactor_expansion", "cofactor_sign", "minor", "det_2x2"})
     )
+    parameter_shapes = {"A": (3, 3)}
 
     def sample_parameters(self, seed: int) -> dict[str, sympy.Basic]:
-        """Sample a 3×3 matrix with entries from −4 to 4."""
+        """Sample a 3×3 matrix with entries from −4 to 4 and a nonzero first row."""
         rng = random.Random(seed)
-        parameters: dict[str, sympy.Basic] = {
-            "A": sympy.ImmutableMatrix(3, 3, lambda i, j: rng.randint(-4, 4))
-        }
+        parameters: dict[str, sympy.Basic] = {"A": sympy.ImmutableMatrix.zeros(3, 3)}
+
+        while self.find_parameter_problem(parameters) is not None:
+            parameters = {"A": sympy.ImmutableMatrix(3, 3, lambda i, j: rng.randint(-4, 4))}
 
         return parameters
+
+    def find_parameter_problem(
+        self, parameters: collections.abc.Mapping[str, sympy.Basic]
+    ) -> contracts.ParameterProblem | None:
+        """Reject a zero first row: the expansion along it would be trivial."""
+        first_row = parameters["A"][0, :]
+        problem = (
+            contracts.ParameterProblem("degenerate_parameters", "the first row of A is zero")
+            if first_row.is_zero_matrix
+            else None
+        )
+
+        return problem
 
     def render_question(
         self, parameters: collections.abc.Mapping[str, sympy.Basic], language: contracts.Language

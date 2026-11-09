@@ -26,6 +26,14 @@ words it replaces under "Retired words". The terms follow Appendix A of the thes
   `ConceptCheck`.
 - **realization** (реалізація): a generated family whose derived concept vector equals the
   requested one.
+- **verification pipeline**: the four checks every variant passes, in order: parameter validity,
+  independent recomputation, text-program agreement, concept check. `la_items.verification`.
+- **reference answer**: the answer computed by a method that shares no code with the step library.
+  `compute_reference_answer`.
+- **text reader**: a family-specific parser that sees only the rendered question, reads its
+  parameters and method, and solves it. `TextReader`.
+- **check failure**: the first check a variant failed, as a stage and a reason code.
+  `CheckFailure`.
 - **distractor** (дистрактор): a wrong option in a multiple-choice question. `Distractor`.
 - **error rule** (правило помилки): a solver with one step replaced by a typical mistake.
   `ErrorRule`.
