@@ -13,7 +13,7 @@ import typing
 
 from la_items.graph import loader
 
-__all__ = ["CONCEPTS", "recording", "step"]
+__all__ = ["CONCEPTS", "perturbing_call", "recording", "step"]
 
 P = typing.ParamSpec("P")
 R = typing.TypeVar("R")
@@ -22,6 +22,10 @@ CONCEPTS: typing.Final = loader.load_graph()
 _active: contextvars.ContextVar[list[str] | None] = contextvars.ContextVar(
     "active_trace", default=None
 )
+# The trace position of one step call and the change applied to its output; see perturbing_call.
+_perturbation: contextvars.ContextVar[
+    tuple[int, collections.abc.Callable[[typing.Any], typing.Any]] | None
+] = contextvars.ContextVar("perturbation", default=None)
 
 
 @contextlib.contextmanager
@@ -41,6 +45,36 @@ def recording() -> collections.abc.Iterator[list[str]]:
 
     finally:
         _active.reset(token)
+
+
+@contextlib.contextmanager
+def perturbing_call(
+    call_index: int, change: collections.abc.Callable[[typing.Any], typing.Any]
+) -> collections.abc.Iterator[None]:
+    """Replace the output of one step call with `change(output)` inside the block.
+
+    The necessity test uses it: if spoiling a call's output leaves the answer unchanged, the
+    answer did not depend on that call.
+
+    Parameters
+    ----------
+    call_index : int
+        The position of the call in the trace, counted from 0.
+    change : Callable
+        It receives the true output and returns the spoiled one.
+
+    Yields
+    ------
+    None
+        Nothing; steps called in the block see the perturbation.
+    """
+    token = _perturbation.set((call_index, change))
+
+    try:
+        yield
+
+    finally:
+        _perturbation.reset(token)
 
 
 def step(
@@ -72,8 +106,13 @@ def step(
             trace = _active.get()
             if trace is None:
                 raise RuntimeError(f"step {fn.__name__} called outside recording()")
+            call_index = len(trace)
             trace.append(concept_id)
             step_output = fn(*args, **kwargs)
+            perturbation = _perturbation.get()
+
+            if perturbation is not None and perturbation[0] == call_index:
+                step_output = perturbation[1](step_output)
 
             return step_output
 

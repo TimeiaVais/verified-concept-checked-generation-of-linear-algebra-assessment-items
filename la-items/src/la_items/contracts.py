@@ -22,6 +22,9 @@ __all__ = [
     "ErrorRule",
     "ItemFamily",
     "Language",
+    "LlmCall",
+    "LlmClient",
+    "LlmResponse",
     "ParameterProblem",
     "ParameterReason",
     "Reason",
@@ -36,8 +39,10 @@ CONCEPTS: typing.Final = loader.load_graph()
 
 Language = typing.Literal["uk", "en"]
 
-# The verification stages, in the order the pipeline runs them.
+# The verification stages, in the order they run. The first two apply to generated code only.
 Stage = typing.Literal[
+    "static_check",
+    "execution",
     "parameter_validity",
     "independent_recomputation",
     "text_program_agreement",
@@ -59,6 +64,15 @@ Reason = (
         "language_mismatch",
         "text_answer_mismatch",
         "concept_mismatch",
+        "syntax_error",
+        "forbidden_import",
+        "forbidden_call",
+        "math_outside_step_library",
+        "missing_family",
+        "timeout",
+        "crashed",
+        "nondeterministic_sampling",
+        "no_text_reader",
     ]
 )
 
@@ -253,9 +267,15 @@ class ItemFamily(typing.Protocol):
     variant always show the same numbers.
     """
 
-    name: str
-    target_concepts: ConceptVector
-    parameter_shapes: collections.abc.Mapping[str, tuple[int, int]]
+    # Read-only members, so a family may define them as plain class attributes of any subtype.
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def target_concepts(self) -> ConceptVector: ...
+
+    @property
+    def parameter_shapes(self) -> collections.abc.Mapping[str, tuple[int, int]]: ...
 
     def sample_parameters(self, seed: int) -> dict[str, sympy.Basic]:
         """Sample the parameters of one variant from an explicit seed."""
@@ -282,3 +302,36 @@ class ItemFamily(typing.Protocol):
     ) -> sympy.Basic:
         """Compute the answer by an independent method, without the step library."""
         ...
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LlmResponse:
+    """The text an LLM returned, and which model and version produced it."""
+
+    text: str
+    model: str
+    model_version: str
+
+
+class LlmClient(typing.Protocol):
+    """The one call the system needs from any LLM provider."""
+
+    def complete(
+        self, prompt: str, parameters: collections.abc.Mapping[str, object]
+    ) -> LlmResponse:
+        """Send the prompt with the call parameters, such as temperature, and return the reply."""
+        ...
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LlmCall:
+    """One logged LLM call: everything needed to repeat or audit it."""
+
+    timestamp: str
+    model: str
+    model_version: str
+    parameters: collections.abc.Mapping[str, object]
+    prompt_name: str
+    prompt_sha256: str
+    prompt: str
+    response: str

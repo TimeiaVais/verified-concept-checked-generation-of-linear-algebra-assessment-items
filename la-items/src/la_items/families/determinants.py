@@ -33,13 +33,26 @@ class Determinant3x3CofactorRow1:
     def find_parameter_problem(
         self, parameters: collections.abc.Mapping[str, sympy.Basic]
     ) -> contracts.ParameterProblem | None:
-        """Reject a zero first row: the expansion along it would be trivial."""
-        first_row = parameters["A"][0, :]
-        problem = (
-            contracts.ParameterProblem("degenerate_parameters", "the first row of A is zero")
-            if first_row.is_zero_matrix
-            else None
-        )
+        """Reject a trivial expansion: a zero first row, or a first row whose minors are all zero.
+
+        When every minor of the first row is zero, as with a zero second or third row, the
+        cofactor signs cannot change the answer, so the item would not test them.
+        """
+        matrix = parameters["A"]
+
+        if matrix[0, :].is_zero_matrix:
+            problem: contracts.ParameterProblem | None = contracts.ParameterProblem(
+                "degenerate_parameters", "the first row of A is zero"
+            )
+
+        elif all(matrix.minor(0, column) == 0 for column in range(3)):
+            problem = contracts.ParameterProblem(
+                "degenerate_parameters",
+                f"every minor of the first row is zero in {matrix.tolist()}",
+            )
+
+        else:
+            problem = None
 
         return problem
 

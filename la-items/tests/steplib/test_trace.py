@@ -41,3 +41,12 @@ def test_unknown_concept_rejected() -> None:
 
 def test_step_exposes_concept() -> None:
     assert det2.concept == "det_2x2"  # type: ignore[attr-defined]
+
+
+def test_perturbing_call_changes_only_that_call() -> None:
+    with trace.recording() as recorded, trace.perturbing_call(1, lambda output: output + 100):
+        first = det2(1, 2, 3, 4)
+        second = det2(1, 2, 3, 4)
+
+    assert (first, second) == (-2, 98)
+    assert recorded == ["det_2x2", "det_2x2"]

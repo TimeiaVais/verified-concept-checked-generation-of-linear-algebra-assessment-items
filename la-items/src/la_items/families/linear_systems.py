@@ -156,8 +156,19 @@ class Solve2x2LinearSystemCramer:
     def find_parameter_problem(
         self, parameters: collections.abc.Mapping[str, sympy.Basic]
     ) -> contracts.ParameterProblem | None:
-        """Require det A ≠ 0; Cramer's rule needs nothing else."""
-        problem = _find_singular_matrix(parameters)
+        """Require det A ≠ 0 and b ≠ 0.
+
+        With b = 0 the solution is (0, 0) whatever det A is, so the item would not need it.
+        """
+        singular_problem = _find_singular_matrix(parameters)
+
+        if singular_problem is None and parameters["b"].is_zero_matrix:
+            problem: contracts.ParameterProblem | None = contracts.ParameterProblem(
+                "degenerate_parameters", "b = 0 gives the zero solution whatever det A is"
+            )
+
+        else:
+            problem = singular_problem
 
         return problem
 

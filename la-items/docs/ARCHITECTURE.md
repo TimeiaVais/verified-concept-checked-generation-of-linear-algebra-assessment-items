@@ -35,11 +35,19 @@ reference solver executed, not from a tag. The users are the course teachers and
 - `la_items.verification`: the verification pipeline. `pipeline.verify_variant()` and
   `verify_family()` run the four stages; `parameters` holds stage 1; `text_readers` holds the text
   readers for stage 3: one for determinants, one for eigenvalues, and one for 2×2 systems that
-  knows the Gauss and the Cramer template. Depends on `la_items.steplib` and `la_items.contracts`, not on
-  `la_items.families`, so a reader cannot reuse a family's rendering.
+  knows the Gauss and the Cramer template. Depends on `la_items.steplib` and
+  `la_items.contracts`, not on `la_items.families`, so a reader cannot reuse a family's rendering.
+- `la_items.generation`: LLM generation with a repair loop, independent of any provider.
+  `llm.LoggedLlmClient` wraps any `contracts.LlmClient` and appends every call to a JSON Lines
+  log; `llm.FileReplayClient` replays saved replies. `prompts` reads the templates in
+  `generation/prompts/*.md`. `static_check` reads generated code with `ast`; `sandbox` runs it in
+  a child process (`sandbox_runner`) with a time limit; `loop.generate_family()` ties them
+  together and `save_generated_family()` writes `generated/<family>/`. `targets` lists the targets
+  that have an example family and a text reader. Depends on all the modules above.
 - `la_items.contracts`: the data structures that item families, verification and generation share
   (`ConceptVector`, `ErrorRule`, `Variant`, `Distractor`, `ConceptCheck`, `CheckFailure`,
-  `VerificationReport`, `TextReading`) and the `ItemFamily` and `TextReader` protocols. Each
+  `VerificationReport`, `TextReading`, `LlmResponse`, `LlmCall`) and the `ItemFamily`,
+  `TextReader` and `LlmClient` protocols. Each
   structure that holds a concept id rejects an id not in the graph. Depends on `la_items.graph`
   and `sympy`.
 
@@ -49,7 +57,8 @@ reference solver executed, not from a tag. The users are the course teachers and
 The report holds the failure as a `CheckFailure`: the stage, a reason code from `contracts.Reason`
 and a detail with the numbers.
 
-1. **Parameter validity.** The family samples the parameters once. The pipeline checks their names
+1. **Parameter validity.** The family samples the parameters twice from the same seed; different
+   results fail the stage. The pipeline then checks their names
    and shapes against `parameter_shapes`, entries within ±100, and the family's own
    `find_parameter_problem` (degenerate cases, a non-unique answer). Then `solve` runs inside
    `recording()`; a step that raises, a division by zero, or an answer that is not finite, too
@@ -59,9 +68,23 @@ and a detail with the numbers.
 3. **Text-program agreement.** The Ukrainian and the English question are rendered from the same
    parameters. The reader parses each text alone. Both languages must read the same, the text must
    show the program's parameters and the family's method, and the reader's own answer must match.
-4. **Concept check.** `ConceptVector.from_trace()` turns the trace of stage 1 into the derived
-   vector; it must equal `target_concepts`.
+4. **Concept check.** The necessity test reruns `solve` once per recorded step call, with that
+   call's output spoiled by `trace.perturbing_call()`. A concept counts only if spoiling at least
+   one of its calls changes the answer. The concepts that count form the derived vector; it must
+   equal `target_concepts`.
+
+`generate_family(target, client)` adds two stages before these, for code an LLM wrote:
+
+1. **Static check.** The reply must contain a ```python block with one family class, imports from
+   an allowlist only, no file, network or interpreter access, and only step library calls in
+   `solve`.
+2. **Execution.** The sandbox runs the four stages above on every seed in a child process; a
+   timeout or a crash fails this stage. The family must declare the requested target.
+
+The first failure, with its stage, reason, seed and detail, goes into the next prompt, up to
+`max_attempts` replies. The accepted family is saved with the model, version, prompt hash and every
+attempt; the call log keeps the full prompts and replies.
 
 `concepts.yaml` is loaded once per module that needs it (`steplib.trace`, `contracts`).
 
-Error rules and LLM generation are not built yet.
+Not built yet: a real provider client, the LLM tagging baseline, experiments and error rules.

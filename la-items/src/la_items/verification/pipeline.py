@@ -1,14 +1,17 @@
 """The verification pipeline: four stages, in order, for each seed of a family.
 
-1. Parameter validity: shapes, size, the family's degenerate cases, and the answer's size.
+1. Parameter validity: the same seed gives the same parameters; shapes, size, the family's
+   degenerate cases, and the answer's size.
 2. Independent recomputation: a reference that shares no code with the step library.
 3. Text-program agreement: a reader that sees only the text must find the same item.
-4. Concept check: the executed steps must give exactly the target concepts.
+4. Concept check: the steps whose output the answer needs must give exactly the target
+   concepts.
 
 The pipeline stops at the first failure; later stages rely on the earlier ones.
 """
 
 import collections.abc
+import typing
 
 import sympy
 
@@ -74,6 +77,55 @@ def _find_recomputation_failure(
         failure = None
 
     return failure
+
+
+# Offsets 1/p with distinct primes: an integer answer cannot absorb them by coincidence, as it
+# can absorb +1 (adding 1 to every entry of (A | b) keeps the solution whenever x + y = 1).
+_PRIMES: typing.Final = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53)
+
+
+def _spoil_step_output(output: typing.Any) -> typing.Any:
+    if isinstance(output, sympy.MatrixBase):
+        rows, columns = output.shape
+        offsets = sympy.ImmutableMatrix(
+            rows, columns, lambda i, j: sympy.Rational(1, _PRIMES[(i * columns + j) % 16])
+        )
+        spoiled = sympy.ImmutableMatrix(output + offsets)
+
+    elif isinstance(output, int | sympy.Expr):
+        spoiled = output + sympy.Rational(1, 59)
+
+    else:
+        raise TypeError(f"cannot spoil a step output of type {type(output).__name__}")
+
+    return spoiled
+
+
+def _find_needed_concepts(
+    family: contracts.ItemFamily,
+    parameters: collections.abc.Mapping[str, sympy.Basic],
+    answer: sympy.Basic,
+    recorded: list[str],
+) -> frozenset[str]:
+    """Keep a concept only if spoiling at least one of its step calls changes the answer."""
+    needed: set[str] = set()
+
+    for call_index, concept_id in enumerate(recorded):
+        if concept_id not in needed:
+            with trace.recording(), trace.perturbing_call(call_index, _spoil_step_output):
+                try:
+                    is_needed = family.solve(parameters) != answer
+
+                # Any failure caused by the spoiled output shows the answer depended on it.
+                except Exception:
+                    is_needed = True
+
+            if is_needed:
+                needed.add(concept_id)
+
+    needed_concepts = frozenset(needed)
+
+    return needed_concepts
 
 
 def _find_text_failure(
@@ -156,7 +208,16 @@ def verify_variant(
     recorded: list[str] = []
     variant = None
     concept_check = None
-    failure = parameter_checks.find_parameter_failure(family, parameters)
+
+    if family.sample_parameters(seed) != parameters:
+        failure: contracts.CheckFailure | None = contracts.CheckFailure(
+            "parameter_validity",
+            "nondeterministic_sampling",
+            f"seed {seed} gave different parameters on a second call",
+        )
+
+    else:
+        failure = parameter_checks.find_parameter_failure(family, parameters)
 
     if failure is None:
         answer, recorded, failure = _solve_with_steps(family, parameters)
@@ -177,16 +238,19 @@ def verify_variant(
         )
         failure = _find_text_failure(reader, questions, parameters, answer)
 
-    if failure is None:
+    if failure is None and answer is not None:
+        needed_concepts = _find_needed_concepts(family, parameters, answer, recorded)
         concept_check = contracts.ConceptCheck(
             requested=family.target_concepts,
-            derived=contracts.ConceptVector.from_trace(recorded),
+            derived=contracts.ConceptVector(needed_concepts),
         )
         if not concept_check.is_accepted:
+            unneeded = sorted(set(recorded) - needed_concepts)
             failure = contracts.CheckFailure(
                 "concept_check",
                 "concept_mismatch",
-                f"missing {sorted(concept_check.missing)}, extra {sorted(concept_check.extra)}",
+                f"missing {sorted(concept_check.missing)}, extra {sorted(concept_check.extra)}, "
+                f"called but not needed {unneeded}",
             )
 
     report = contracts.VerificationReport(

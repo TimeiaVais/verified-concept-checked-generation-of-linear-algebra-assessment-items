@@ -6,6 +6,7 @@ import sympy
 from la_items import contracts
 from la_items.families import determinants, eigenvalues, linear_systems
 from la_items.steplib import determinants as determinant_steps
+from la_items.steplib import linear_systems as linear_systems_steps
 from la_items.verification import parameters, pipeline, text_readers
 
 Parameters = collections.abc.Mapping[str, sympy.Basic]
@@ -347,3 +348,75 @@ def test_gauss_and_cramer_give_the_same_answer_with_different_concepts() -> None
     assert gauss.variant.answer == cramer.variant.answer
     assert gauss.concept_check is not None and cramer.concept_check is not None
     assert gauss.concept_check.derived != cramer.concept_check.derived
+
+
+# --- Seed determinism and the necessity test ------------------------------------------------------
+
+
+class NondeterministicSampler(DETERMINANT):
+    calls = 0
+
+    def sample_parameters(self, seed: int) -> dict[str, sympy.Basic]:
+        NondeterministicSampler.calls += 1
+        return super().sample_parameters(seed + NondeterministicSampler.calls)
+
+
+class UnusedExtraStep(DETERMINANT):
+    """Calls a step whose output the answer never uses."""
+
+    def solve(self, parameters: Parameters) -> sympy.Basic:
+        linear_systems_steps.augmented_matrix(parameters["A"][:, :2], parameters["A"][:, 2])
+        return determinant_steps.cofactor_expansion(parameters["A"])
+
+
+class PaddedTarget(UnusedExtraStep):
+    """Claims a concept whose only step call does not feed the answer."""
+
+    target_concepts = contracts.ConceptVector(
+        DETERMINANT.target_concepts.concepts | {"slae_matrix_form"}
+    )
+
+
+def test_nondeterministic_sampling_is_rejected() -> None:
+    report = pipeline.verify_variant(NondeterministicSampler(), DETERMINANT_READER, 0)
+
+    assert report.failure is not None
+    assert report.failure.reason == "nondeterministic_sampling"
+
+
+def test_unneeded_step_does_not_enter_the_vector() -> None:
+    report = pipeline.verify_variant(UnusedExtraStep(), DETERMINANT_READER, 0)
+
+    assert report.is_accepted
+    assert report.concept_check is not None
+    assert "slae_matrix_form" not in report.concept_check.derived.concepts
+
+
+def test_concept_called_only_for_show_is_missing() -> None:
+    report = pipeline.verify_variant(PaddedTarget(), DETERMINANT_READER, 0)
+
+    assert report.failure is not None and report.failure.reason == "concept_mismatch"
+    assert "missing ['slae_matrix_form']" in report.failure.detail
+    assert "called but not needed ['slae_matrix_form']" in report.failure.detail
+
+
+class ZeroSecondRow(DETERMINANT):
+    sample_parameters = fixed_parameters(A=[[-3, 4, -1], [0, 0, 0], [-3, 3, 0]])
+
+
+class CramerZeroConstants(CRAMER):
+    sample_parameters = fixed_parameters(A=[[-1, 1], [3, 1]], b=[[0], [0]])
+
+
+@pytest.mark.parametrize(
+    ("family", "reader"),
+    [(ZeroSecondRow(), DETERMINANT_READER), (CramerZeroConstants(), CRAMER_READER)],
+    ids=["zero-row", "zero-b"],
+)
+def test_cases_where_a_target_concept_cannot_matter_are_degenerate(
+    family: contracts.ItemFamily, reader: contracts.TextReader
+) -> None:
+    report = pipeline.verify_variant(family, reader, 0)
+
+    assert report.failure is not None
+    assert report.failure.reason == "degenerate_parameters"

@@ -34,6 +34,16 @@ words it replaces under "Retired words". The terms follow Appendix A of the thes
   parameters and method, and solves it. `TextReader`.
 - **check failure**: the first check a variant failed, as a stage and a reason code.
   `CheckFailure`.
+- **necessity test**: rerunning the solution with one step call's output spoiled; the call's
+  concept counts only if the answer changes. `verification.pipeline`.
+- **static check**: reading generated code with `ast`, before it runs, against the import
+  allowlist and the step-library-only rule for `solve`. `generation.static_check`.
+- **sandbox**: the child process with a time limit that runs generated code.
+  `generation.sandbox`.
+- **repair loop** (цикл виправлення): returning a failed family's check failure to the LLM and
+  asking again, up to a fixed number of attempts. `generation.loop`.
+- **LLM call log**: one JSON line per LLM call with the model, version, parameters, prompt and
+  reply. `contracts.LlmCall`.
 - **distractor** (дистрактор): a wrong option in a multiple-choice question. `Distractor`.
 - **error rule** (правило помилки): a solver with one step replaced by a typical mistake.
   `ErrorRule`.
