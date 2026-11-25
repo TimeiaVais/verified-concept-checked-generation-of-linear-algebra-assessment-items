@@ -9,7 +9,7 @@ import sympy
 
 from la_items.steplib import trace
 
-__all__ = ["cofactor_expansion", "cofactor_sign", "det_2x2", "minor"]
+__all__ = ["cofactor_expansion", "cofactor_sign", "det_2x2", "det_3x3_rule_of_triangles", "minor"]
 
 
 def _check_shape(matrix: sympy.ImmutableMatrix, size: int) -> None:
@@ -114,5 +114,38 @@ def cofactor_expansion(matrix: sympy.ImmutableMatrix) -> sympy.Expr:
 
     for column in range(3):
         determinant += matrix[0, column] * cofactor_sign(0, column) * minor(matrix, 0, column)
+
+    return determinant
+
+
+@trace.step("det_3x3_triangle")
+def det_3x3_rule_of_triangles(matrix: sympy.ImmutableMatrix) -> sympy.Expr:
+    """Compute a 3×3 determinant by the rule of triangles (Sarrus): six signed products.
+
+    Parameters
+    ----------
+    matrix : sympy.ImmutableMatrix
+        A 3×3 matrix.
+
+    Returns
+    -------
+    sympy.Expr
+        The determinant.
+
+    Raises
+    ------
+    ValueError
+        It raises when the matrix is not 3×3.
+    """
+    _check_shape(matrix, 3)
+    a = matrix
+    determinant = (
+        a[0, 0] * a[1, 1] * a[2, 2]
+        + a[0, 1] * a[1, 2] * a[2, 0]
+        + a[0, 2] * a[1, 0] * a[2, 1]
+        - a[0, 2] * a[1, 1] * a[2, 0]
+        - a[0, 0] * a[1, 2] * a[2, 1]
+        - a[0, 1] * a[1, 0] * a[2, 2]
+    )
 
     return determinant

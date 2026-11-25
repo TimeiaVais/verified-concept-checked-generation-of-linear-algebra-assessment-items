@@ -44,6 +44,13 @@ words it replaces under "Retired words". The terms follow Appendix A of the thes
   asking again, up to a fixed number of attempts. `generation.loop`.
 - **LLM call log**: one JSON line per LLM call with the model, version, parameters, prompt and
   reply. `contracts.LlmCall`.
+- **reference set** (еталонний набір): course exercises with concept labels the system did not
+  produce. `la_items.reference`.
+- **label** (мітка поняття): the hand-written concept vector of one reference exercise part, from
+  its textbook section and method. `Exercise.label`.
+- **main concept**: the concept a reference exercise's section is about. `Exercise.main_concept`.
+- **book erratum**: a printed answer that does not fit the printed exercise; kept and explained.
+  `Exercise.book_erratum`.
 - **distractor** (дистрактор): a wrong option in a multiple-choice question. `Distractor`.
 - **error rule** (правило помилки): a solver with one step replaced by a typical mistake.
   `ErrorRule`.

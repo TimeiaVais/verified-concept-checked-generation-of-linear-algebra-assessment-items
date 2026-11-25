@@ -11,12 +11,12 @@ The pipeline stops at the first failure; later stages rely on the earlier ones.
 """
 
 import collections.abc
-import typing
 
 import sympy
 
 from la_items import contracts
 from la_items.steplib import trace
+from la_items.verification import necessity
 from la_items.verification import parameters as parameter_checks
 
 __all__ = ["verify_family", "verify_variant"]
@@ -77,55 +77,6 @@ def _find_recomputation_failure(
         failure = None
 
     return failure
-
-
-# Offsets 1/p with distinct primes: an integer answer cannot absorb them by coincidence, as it
-# can absorb +1 (adding 1 to every entry of (A | b) keeps the solution whenever x + y = 1).
-_PRIMES: typing.Final = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53)
-
-
-def _spoil_step_output(output: typing.Any) -> typing.Any:
-    if isinstance(output, sympy.MatrixBase):
-        rows, columns = output.shape
-        offsets = sympy.ImmutableMatrix(
-            rows, columns, lambda i, j: sympy.Rational(1, _PRIMES[(i * columns + j) % 16])
-        )
-        spoiled = sympy.ImmutableMatrix(output + offsets)
-
-    elif isinstance(output, int | sympy.Expr):
-        spoiled = output + sympy.Rational(1, 59)
-
-    else:
-        raise TypeError(f"cannot spoil a step output of type {type(output).__name__}")
-
-    return spoiled
-
-
-def _find_needed_concepts(
-    family: contracts.ItemFamily,
-    parameters: collections.abc.Mapping[str, sympy.Basic],
-    answer: sympy.Basic,
-    recorded: list[str],
-) -> frozenset[str]:
-    """Keep a concept only if spoiling at least one of its step calls changes the answer."""
-    needed: set[str] = set()
-
-    for call_index, concept_id in enumerate(recorded):
-        if concept_id not in needed:
-            with trace.recording(), trace.perturbing_call(call_index, _spoil_step_output):
-                try:
-                    is_needed = family.solve(parameters) != answer
-
-                # Any failure caused by the spoiled output shows the answer depended on it.
-                except Exception:
-                    is_needed = True
-
-            if is_needed:
-                needed.add(concept_id)
-
-    needed_concepts = frozenset(needed)
-
-    return needed_concepts
 
 
 def _find_text_failure(
@@ -239,7 +190,9 @@ def verify_variant(
         failure = _find_text_failure(reader, questions, parameters, answer)
 
     if failure is None and answer is not None:
-        needed_concepts = _find_needed_concepts(family, parameters, answer, recorded)
+        needed_concepts = necessity.find_needed_concepts(
+            lambda: family.solve(parameters), answer, recorded
+        )
         concept_check = contracts.ConceptCheck(
             requested=family.target_concepts,
             derived=contracts.ConceptVector(needed_concepts),

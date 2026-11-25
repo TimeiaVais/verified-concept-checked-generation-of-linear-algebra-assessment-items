@@ -64,7 +64,7 @@ def test_prompt_renders_with_every_placeholder_filled() -> None:
 def test_step_library_description_lists_every_step() -> None:
     description = prompts.describe_step_library()
 
-    assert len(description.splitlines()) == 13
+    assert len(description.splitlines()) == 20
     assert "records `cramer_rule`" in description
 
 

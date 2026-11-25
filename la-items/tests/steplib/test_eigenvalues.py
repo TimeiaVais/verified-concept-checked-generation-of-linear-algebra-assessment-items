@@ -58,3 +58,32 @@ def test_eigenvalues_match_sympy_eigenvals() -> None:
 def test_complex_eigenvalues_rejected() -> None:
     with trace.recording(), pytest.raises(ValueError, match="no real eigenvalues"):
         eigenvalues.eigenvalues_2x2(sympy.ImmutableMatrix([[0, -1], [1, 0]]))
+
+
+@pytest.mark.parametrize(
+    ("rows", "expected"),
+    [
+        ([[3, -2, 2], [2, -1, 2], [2, -2, 3]], [1, 1, 3]),
+        ([[5, 6, -3], [-1, 0, 1], [1, 2, -1]], [1 - sympy.sqrt(3), 2, 1 + sympy.sqrt(3)]),
+        ([[0, 0, 0], [0, 1, 0], [0, 0, 2]], [0, 1, 2]),
+    ],
+    ids=["repeated", "irrational", "zero-root"],
+)
+def test_eigenvalues_3x3(rows: list[list[int]], expected: list[sympy.Expr]) -> None:
+    with trace.recording() as recorded:
+        found = eigenvalues.eigenvalues_3x3(sympy.ImmutableMatrix(rows))
+
+    assert found == sympy.ImmutableMatrix(expected)
+    assert {"eigenvalue", "characteristic_polynomial", "cofactor_expansion"} <= set(recorded)
+
+
+@pytest.mark.parametrize(
+    ("rows", "message"),
+    [
+        ([[0, -1, 0], [1, 0, 0], [0, 0, 1]], "no real eigenvalues"),
+        ([[0, 0, 2], [1, 0, 0], [0, 1, 0]], "no integer root"),
+    ],
+)
+def test_eigenvalues_3x3_rejects(rows: list[list[int]], message: str) -> None:
+    with trace.recording(), pytest.raises(ValueError, match=message):
+        eigenvalues.eigenvalues_3x3(sympy.ImmutableMatrix(rows))

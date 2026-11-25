@@ -69,3 +69,15 @@ def test_cofactor_expansion_trace_gives_the_four_concepts() -> None:
 def test_wrong_shape_rejected(step: object, matrix: sympy.ImmutableMatrix) -> None:
     with trace.recording(), pytest.raises(ValueError, match="expected a"):
         step(matrix)  # type: ignore[operator]
+
+
+def test_rule_of_triangles_matches_sympy_det() -> None:
+    rng = random.Random(1)
+
+    for _ in range(200):
+        matrix = sympy.ImmutableMatrix(3, 3, lambda i, j: rng.randint(-4, 4))
+
+        with trace.recording() as recorded:
+            assert determinants.det_3x3_rule_of_triangles(matrix) == matrix.det()
+
+        assert recorded == ["det_3x3_triangle"]
